@@ -73,7 +73,7 @@ export const treeNodes: TreeNode[] = [
 		label: 'Experience',
 		description: 'My professional journey.',
 		x: 150,
-		y: -100,
+		y: -200,
 		parentId: 'origin',
 		category: 'experience',
 		size: 'large',
@@ -84,7 +84,7 @@ export const treeNodes: TreeNode[] = [
 		label: 'Software Engineer',
 		description: 'Junior developer at the start of my career.',
 		x: 212,
-		y: -191,
+		y: -291,
 		parentId: 'exp-branch',
 		category: 'experience',
 		size: 'small',
@@ -103,7 +103,7 @@ export const treeNodes: TreeNode[] = [
 		label: 'Software Engineer',
 		description: 'Slightly more experienced still early in my career.',
 		x: 337,
-		y: -191,
+		y: -291,
 		parentId: 'exp-job1',
 		category: 'experience',
 		size: 'small',
@@ -122,7 +122,7 @@ export const treeNodes: TreeNode[] = [
 		label: 'Intermediate Software Engineer',
 		description: 'Slightly more experienced.',
 		x: 400,
-		y: -100,
+		y: -200,
 		parentId: 'exp-job2',
 		category: 'experience',
 		size: 'small',
@@ -141,7 +141,7 @@ export const treeNodes: TreeNode[] = [
 		label: 'Intermediate Software Engineer',
 		description: 'Where one journey ends, another begins.',
 		x: 337,
-		y: -8,
+		y: -108,
 		parentId: 'exp-job3',
 		category: 'experience',
 		size: 'small',
@@ -160,7 +160,7 @@ export const treeNodes: TreeNode[] = [
 		label: 'Lead Associate',
 		description: 'Where I am now.',
 		x: 212,
-		y: -8,
+		y: -108,
 		parentId: 'exp-job4',
 		category: 'experience',
 		size: 'small',
@@ -183,6 +183,7 @@ export const treeNodes: TreeNode[] = [
 		parentId: 'origin',
 		category: 'projects',
 		size: 'large',
+		icon: '/icons/projects.svg'
 	},
 	{
 		id: 'proj-1',
@@ -218,36 +219,59 @@ export const treeNodes: TreeNode[] = [
         icon: '/icons/skills.svg'
 	},
 	{
-		id: 'skill-js',
-		label: 'JavaScript',
-		description: 'Core language of the web. Proficient in modern ES6+ features.',
+		id: 'concepts',
+		label: 'Concepts',
+		description: 'Core concepts I have learned throughout my career.',
 		x: 280,
 		y: 60,
 		parentId: 'skills-branch',
 		category: 'skills',
 		size: 'medium',
-        icon: '/icons/javascript.png',
+        icon: '/icons/concepts.svg',
 	},
 	{
-		id: 'skill-ts',
-		label: 'TypeScript',
-		description: 'Type-safe JavaScript. My preferred way to write code.',
+		id: 'tools-devops',
+		label: 'Tools & DevOps',
+		description: 'The tools I use to get work done!',
 		x: 320,
 		y: 140,
 		parentId: 'skills-branch',
 		category: 'skills',
 		size: 'small',
-        icon: '/icons/typescript.png'
+        icon: '/icons/devops.svg'
 	},
 	{
-		id: 'skill-svelte',
-		label: 'Svelte',
-		description: 'The framework powering this portfolio!',
+		id: 'frontend',
+		label: 'Frontend',
+		description: 'The Frontend tools and frameworks I know!',
 		x: 260,
 		y: 200,
 		parentId: 'skills-branch',
 		category: 'skills',
 		size: 'small',
+		icon: '/icons/frontend.svg'
+	},
+	{
+		id: 'backend-real-time',
+		label: 'Backend & Real-Time',
+		description: 'The Backend frameworks and concepts I know!',
+		x: 150,
+		y: 225,
+		parentId: 'skills-branch',
+		category: 'skills',
+		size: 'small',
+		icon: '/icons/backend.svg'
+	},
+	{
+		id: 'languages',
+		label: 'Languages',
+		description: 'The many languages I know!',
+		x: 50,
+		y: 200,
+		parentId: 'skills-branch',
+		category: 'skills',
+		size: 'small',
+		icon: '/icons/languages.svg'
 	},
 
 	// ========== EDUCATION (Bottom Left Quadrant) ==========
@@ -260,6 +284,7 @@ export const treeNodes: TreeNode[] = [
 		parentId: 'origin',
 		category: 'education',
 		size: 'large',
+		icon: '/icons/education.svg'
 	},
 	{
 		id: 'edu-degree',
@@ -270,17 +295,23 @@ export const treeNodes: TreeNode[] = [
 		parentId: 'edu-branch',
 		category: 'education',
 		size: 'small',
+		institution: 'Green River College',
+		degree: 'Bachelor\'s Degree of Applied Science',
+		field: 'IT/Software Development',
+		graduationYear: '2017',
+		icon: '/icons/greenriver.png'
+
 	},
-	{
-		id: 'edu-cert',
-		label: 'Certifications',
-		description: 'Additional certifications and courses completed.',
-		x: -280,
-		y: 180,
-		parentId: 'edu-branch',
-		category: 'education',
-		size: 'small',
-	},
+	// {
+	// 	id: 'edu-cert',
+	// 	label: 'Certifications',
+	// 	description: 'Additional certifications and courses completed.',
+	// 	x: -280,
+	// 	y: 180,
+	// 	parentId: 'edu-branch',
+	// 	category: 'education',
+	// 	size: 'small',
+	// },
 ];
 
 // Colors for each category (PoE-inspired)
@@ -288,6 +319,6 @@ export const categoryColors: Record<TreeNode['category'], number> = {
 	origin: 0xffd700,      // Gold
 	experience: 0x4ecdc4,  // Teal
 	projects: 0xff6b6b,    // Coral red
-	skills: 0x95e1d3,      // Mint green
+	skills: 0xf9a825,      // Amber orange
 	education: 0xdda0dd,   // Plum purple
 };
