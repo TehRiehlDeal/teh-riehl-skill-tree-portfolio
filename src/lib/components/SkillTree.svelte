@@ -18,26 +18,35 @@
 	let windowWidth = 0;
 	let windowHeight = 0;
 
+	let modalOpenedAt = 0;
+
 	function openModal(node: TreeNode) {
 		selectedNode = node;
 		modalVisible = true;
+		modalOpenedAt = Date.now();
 		// Hide tooltip when modal opens
 		hoveredNode = null;
 	}
 
 	function closeModal() {
-		modalVisible = false;
-		setTimeout(() => {
-			selectedNode = null;
-		}, 200);
+	// Prevent closing if modal just opened (within 300ms)
+	// This fixes touch events "bleeding through" on mobile
+	if (Date.now() - modalOpenedAt < 300) {
+		return;
 	}
+	
+	modalVisible = false;
+	setTimeout(() => {
+		selectedNode = null;
+	}, 200);
+}
 
 	function getCategoryColorHex(category: TreeNode['category']): string {
 		const colorMap: Record<TreeNode['category'], string> = {
 			origin: '#ffd700',
 			experience: '#4ecdc4',
 			projects: '#ff6b6b',
-			skills: '#95e1d3',
+			skills: '#f9a825',
 			education: '#dda0dd',
 		};
 		return colorMap[category];
@@ -53,6 +62,8 @@
 	onMount(async () => {
 		handleResize();
 		window.addEventListener('resize', handleResize);
+
+		const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 		const app = new Application();
 
@@ -245,16 +256,45 @@
 			}
 		}, { passive: true });
 
+		// ========== TOUCH EVENTS FOR PANNING & ZOOMING ==========
+		let touchStartedOnNode = false;
+
+		app.canvas.addEventListener('touchstart', (e: TouchEvent) => {
+			// Check if touch started on a node by seeing if the target is interactive
+			touchStartedOnNode = false;
+			
+			if (e.touches.length === 1) {
+				// Single touch - prepare for potential panning
+				isDragging = true;
+				hasMoved = false;
+				isTouchZooming = false;
+				dragStartX = e.touches[0].clientX;
+				dragStartY = e.touches[0].clientY;
+				containerStartX = treeContainer.x;
+				containerStartY = treeContainer.y;
+			} else if (e.touches.length === 2) {
+				// Two touches - start pinch zoom
+				isDragging = false;
+				isTouchZooming = true;
+				hasMoved = true; // Pinch zoom counts as movement
+				const dx = e.touches[0].clientX - e.touches[1].clientX;
+				const dy = e.touches[0].clientY - e.touches[1].clientY;
+				lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+			}
+		}, { passive: true });
+
 		app.canvas.addEventListener('touchmove', (e: TouchEvent) => {
 			if (e.touches.length === 1 && isDragging && !isTouchZooming) {
 				// Single touch - panning
 				const dx = e.touches[0].clientX - dragStartX;
 				const dy = e.touches[0].clientY - dragStartY;
-				if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+				
+				// Only count as moved if we've moved more than a small threshold
+				if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
 					hasMoved = true;
+					treeContainer.x = containerStartX + dx;
+					treeContainer.y = containerStartY + dy;
 				}
-				treeContainer.x = containerStartX + dx;
-				treeContainer.y = containerStartY + dy;
 			} else if (e.touches.length === 2 && isTouchZooming) {
 				// Two touches - pinch zoom
 				const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -296,6 +336,7 @@
 				// Went from 2 touches to 1 - reset pan start
 				isTouchZooming = false;
 				isDragging = true;
+				hasMoved = true; // Consider this movement since we were zooming
 				dragStartX = e.touches[0].clientX;
 				dragStartY = e.touches[0].clientY;
 				containerStartX = treeContainer.x;
@@ -332,7 +373,7 @@
 				case 'large':
 					return 30 * mobileFactor;
 				case 'medium':
-					return 20 * mobileFactor;
+					return 25 * mobileFactor;
 				case 'small':
 					return 20 * mobileFactor;
 				default:
@@ -426,6 +467,10 @@
 				profileContainer.eventMode = 'static';
 				profileContainer.cursor = 'pointer';
 
+				profileContainer.on('pointerdown', () => {
+					hasMoved = false;
+				});
+
 				profileContainer.on('pointerup', () => {
 					if (!hasMoved) {
 						openModal(node);
@@ -435,13 +480,13 @@
 				profileContainer.on('pointerover', () => {
 					gsap.to(profileContainer.scale, { x: 1.2, y: 1.2, duration: 0.2 });
 					gsap.to(glowGraphics, { alpha: 1.5, duration: 0.2 });
-					if (!isMobile) hoveredNode = node;
+					if (!isTouchDevice) hoveredNode = node;
 				});
 
 				profileContainer.on('pointerout', () => {
 					gsap.to(profileContainer.scale, { x: 1, y: 1, duration: 0.2 });
 					gsap.to(glowGraphics, { alpha: 1, duration: 0.2 });
-					hoveredNode = null;
+					if (!isTouchDevice) hoveredNode = null;
 				});
 
 				treeContainer.addChild(profileContainer);
@@ -488,6 +533,10 @@
 				nodeContainer.eventMode = 'static';
 				nodeContainer.cursor = 'pointer';
 
+				nodeContainer.on('pointerdown', () => {
+					hasMoved = false;
+				});
+
 				nodeContainer.on('pointerup', () => {
 					if (!hasMoved) {
 						openModal(node);
@@ -497,13 +546,13 @@
 				nodeContainer.on('pointerover', () => {
 					gsap.to(nodeContainer.scale, { x: 1.2, y: 1.2, duration: 0.2 });
 					gsap.to(glowGraphics, { alpha: 1.5, duration: 0.2 });
-					if (!isMobile) hoveredNode = node;
+					if (!isTouchDevice) hoveredNode = node;
 				});
 
 				nodeContainer.on('pointerout', () => {
 					gsap.to(nodeContainer.scale, { x: 1, y: 1, duration: 0.2 });
 					gsap.to(glowGraphics, { alpha: 1, duration: 0.2 });
-					hoveredNode = null;
+					if (!isTouchDevice) hoveredNode = null;
 				});
 
 				treeContainer.addChild(nodeContainer);
