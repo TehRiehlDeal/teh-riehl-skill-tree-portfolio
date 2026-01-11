@@ -899,6 +899,15 @@
 							<a href={selectedNode.website} target="_blank" rel="noopener noreferrer" title="Website">🌐 Website</a>
 						{/if}
 					</div>
+					{#if selectedNode.resumeUrl}
+					<a
+						href={selectedNode.resumeUrl}
+						download
+						class="resume-button"
+					>
+						📄 Download Resume
+					</a>
+				{/if}
 				{/if}
 			{/if}
 
@@ -1314,5 +1323,30 @@
 			font-size: 1.75rem;
 			padding: 0.75rem;
 		}
+	}
+
+	.resume-button {
+		display: block;
+		width: 100%;
+		margin-top: 1rem;
+		padding: 0.75rem 1rem;
+		background: linear-gradient(135deg, var(--node-color), color-mix(in srgb, var(--node-color) 70%, black));
+		color: #0a0a0f;
+		text-align: center;
+		text-decoration: none;
+		font-weight: 600;
+		font-size: 0.9rem;
+		border-radius: 8px;
+		transition: all 0.2s ease;
+		box-shadow: 0 0 20px color-mix(in srgb, var(--node-color) 30%, transparent);
+	}
+
+	.resume-button:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 0 30px color-mix(in srgb, var(--node-color) 50%, transparent);
+	}
+
+	.resume-button:active {
+		transform: translateY(0);
 	}
 </style>
