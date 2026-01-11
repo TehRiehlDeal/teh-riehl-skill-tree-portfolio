@@ -75,36 +75,180 @@
 
 		container.appendChild(app.canvas);
 
-		// ========== BACKGROUND LAYER (Stars + Particles) ==========
-		const backgroundContainer = new Container();
-		app.stage.addChild(backgroundContainer);
+		// ========== BACKGROUND LAYERS ==========
+		// We create multiple layers for depth
+		const deepBackgroundContainer = new Container();
+		const nebulaContainer = new Container();
+		const starContainer = new Container();
+		
+		app.stage.addChild(deepBackgroundContainer);
+		app.stage.addChild(nebulaContainer);
+		app.stage.addChild(starContainer);
 
-		// Create starfield
-		const stars: { graphics: Graphics; speed: number; baseAlpha: number }[] = [];
-		const starCount = isMobile ? 80 : 150;
+		const screenWidth = app.screen.width;
+		const screenHeight = app.screen.height;
+		const centerX = screenWidth / 2;
+		const centerY = screenHeight / 2;
 
-		for (let i = 0; i < starCount; i++) {
+		// ========== DEEP SPACE GRADIENT ==========
+		// Create a radial gradient from deep blue to black
+		const spaceGradient = new Graphics();
+		const gradientRadius = Math.max(screenWidth, screenHeight);
+		
+		// Layer multiple circles for a gradient effect
+		const gradientSteps = 15;
+		for (let i = gradientSteps; i >= 0; i--) {
+			const ratio = i / gradientSteps;
+			const radius = gradientRadius * (0.3 + ratio * 0.7);
+			
+			// Blend from deep purple/blue in center to pure black at edges
+			const r = Math.floor(8 * (1 - ratio));
+			const g = Math.floor(6 * (1 - ratio));
+			const b = Math.floor(20 * (1 - ratio));
+			const color = (r << 16) + (g << 8) + b;
+			
+			spaceGradient
+				.circle(centerX, centerY, radius)
+				.fill({ color: color, alpha: 0.8 });
+		}
+		deepBackgroundContainer.addChild(spaceGradient);
+
+		// ========== NEBULA CLOUDS ==========
+		const nebulaColors = [
+			{ color: 0x4ecdc4, name: 'teal' },      // Experience
+			{ color: 0xff6b6b, name: 'coral' },     // Projects
+			{ color: 0xf9a825, name: 'amber' },     // Skills
+			{ color: 0xdda0dd, name: 'plum' },      // Education
+			{ color: 0x6b5b95, name: 'purple' },    // Extra accent
+		];
+
+		// Create large nebula cloud regions
+		const nebulaRegions: { graphics: Graphics; baseX: number; baseY: number; pulseSpeed: number }[] = [];
+		
+		nebulaColors.forEach((nebula, index) => {
+			// Position nebulas in different quadrants, offset from center
+			const angle = (index / nebulaColors.length) * Math.PI * 2 + Math.PI / 4;
+			const distance = Math.min(screenWidth, screenHeight) * 0.35;
+			const baseX = centerX + Math.cos(angle) * distance;
+			const baseY = centerY + Math.sin(angle) * distance;
+
+			// Create multi-layered nebula cloud
+			const nebulaCloud = new Graphics();
+			
+			// Outer very faint glow
+			const outerSize = 200 + Math.random() * 150;
+			for (let layer = 5; layer >= 0; layer--) {
+				const layerRatio = layer / 5;
+				const size = outerSize * (0.4 + layerRatio * 0.6);
+				const alpha = 0.02 * (1 - layerRatio);
+				
+				nebulaCloud
+					.circle(0, 0, size)
+					.fill({ color: nebula.color, alpha: alpha });
+			}
+
+			// Add some irregular shapes for more organic look
+			for (let i = 0; i < 3; i++) {
+				const offsetX = (Math.random() - 0.5) * 100;
+				const offsetY = (Math.random() - 0.5) * 100;
+				const blobSize = 60 + Math.random() * 80;
+				
+				for (let layer = 3; layer >= 0; layer--) {
+					const layerRatio = layer / 3;
+					const size = blobSize * (0.5 + layerRatio * 0.5);
+					const alpha = 0.03 * (1 - layerRatio);
+					
+					nebulaCloud
+						.circle(offsetX, offsetY, size)
+						.fill({ color: nebula.color, alpha: alpha });
+				}
+			}
+
+			nebulaCloud.x = baseX;
+			nebulaCloud.y = baseY;
+			nebulaContainer.addChild(nebulaCloud);
+			
+			nebulaRegions.push({
+				graphics: nebulaCloud,
+				baseX: baseX,
+				baseY: baseY,
+				pulseSpeed: 0.5 + Math.random() * 0.5,
+			});
+
+			// Animate nebula pulsing
+			gsap.to(nebulaCloud, {
+				alpha: 0.6,
+				duration: 3 + Math.random() * 2,
+				ease: 'sine.inOut',
+				yoyo: true,
+				repeat: -1,
+				delay: Math.random() * 2,
+			});
+
+			gsap.to(nebulaCloud.scale, {
+				x: 1.1,
+				y: 1.1,
+				duration: 4 + Math.random() * 2,
+				ease: 'sine.inOut',
+				yoyo: true,
+				repeat: -1,
+				delay: Math.random() * 2,
+			});
+		});
+
+		// ========== DISTANT STAR FIELD ==========
+		// Layer 1: Tiny distant stars (many, dim)
+		const distantStarCount = isMobile ? 100 : 200;
+		for (let i = 0; i < distantStarCount; i++) {
 			const star = new Graphics();
-			const size = Math.random() * 2 + 0.5;
-			const alpha = Math.random() * 0.6 + 0.2;
+			const size = Math.random() * 1 + 0.5;
+			const alpha = Math.random() * 0.4 + 0.1;
 
 			star
 				.circle(0, 0, size)
 				.fill({ color: 0xffffff, alpha: alpha });
 
-			star.x = Math.random() * app.screen.width;
-			star.y = Math.random() * app.screen.height;
+			star.x = Math.random() * screenWidth;
+			star.y = Math.random() * screenHeight;
+			starContainer.addChild(star);
 
-			backgroundContainer.addChild(star);
-			stars.push({
-				graphics: star,
-				speed: Math.random() * 0.3 + 0.1,
-				baseAlpha: alpha,
-			});
-
+			// Gentle twinkle
 			gsap.to(star, {
 				alpha: alpha * 0.3,
-				duration: Math.random() * 2 + 1,
+				duration: 1 + Math.random() * 2,
+				ease: 'sine.inOut',
+				yoyo: true,
+				repeat: -1,
+				delay: Math.random() * 3,
+			});
+		}
+
+		// Layer 2: Medium stars with color tints
+		const mediumStarCount = isMobile ? 30 : 60;
+		const starTints = [0xffffff, 0xfff8e7, 0xe7f0ff, 0xffe7e7, 0xe7ffe7];
+		
+		for (let i = 0; i < mediumStarCount; i++) {
+			const star = new Graphics();
+			const size = Math.random() * 1.5 + 1;
+			const alpha = Math.random() * 0.5 + 0.3;
+			const tint = starTints[Math.floor(Math.random() * starTints.length)];
+
+			// Star with subtle glow
+			star
+				.circle(0, 0, size + 2)
+				.fill({ color: tint, alpha: alpha * 0.2 });
+			star
+				.circle(0, 0, size)
+				.fill({ color: tint, alpha: alpha });
+
+			star.x = Math.random() * screenWidth;
+			star.y = Math.random() * screenHeight;
+			starContainer.addChild(star);
+
+			// Twinkle animation
+			gsap.to(star, {
+				alpha: alpha * 0.4,
+				duration: 0.5 + Math.random() * 1.5,
 				ease: 'sine.inOut',
 				yoyo: true,
 				repeat: -1,
@@ -112,71 +256,110 @@
 			});
 		}
 
-		// Create floating particles (fewer on mobile)
-		const particles: {
-			graphics: Graphics;
-			vx: number;
-			vy: number;
-			baseX: number;
-			baseY: number;
-		}[] = [];
-		const particleCount = isMobile ? 20 : 40;
-		const particleColors = [0x4ecdc4, 0xff6b6b, 0x95e1d3, 0xdda0dd, 0xffd700];
+		// Layer 3: Bright feature stars (few, prominent)
+		const brightStarCount = isMobile ? 8 : 15;
+		for (let i = 0; i < brightStarCount; i++) {
+			const star = new Graphics();
+			const size = Math.random() * 2 + 1.5;
+			const tint = starTints[Math.floor(Math.random() * starTints.length)];
 
-		for (let i = 0; i < particleCount; i++) {
-			const particle = new Graphics();
-			const size = Math.random() * 20 + 10;
-			const color = particleColors[Math.floor(Math.random() * particleColors.length)];
-
-			particle
+			// Multi-layer glow for bright stars
+			star
+				.circle(0, 0, size + 6)
+				.fill({ color: tint, alpha: 0.05 });
+			star
+				.circle(0, 0, size + 3)
+				.fill({ color: tint, alpha: 0.1 });
+			star
 				.circle(0, 0, size)
-				.fill({ color: color, alpha: 0.03 });
-			particle
-				.circle(0, 0, size * 0.6)
-				.fill({ color: color, alpha: 0.05 });
-			particle
-				.circle(0, 0, size * 0.3)
-				.fill({ color: color, alpha: 0.08 });
+				.fill({ color: 0xffffff, alpha: 0.9 });
 
-			const x = Math.random() * app.screen.width;
-			const y = Math.random() * app.screen.height;
-			particle.x = x;
-			particle.y = y;
+			star.x = Math.random() * screenWidth;
+			star.y = Math.random() * screenHeight;
+			starContainer.addChild(star);
 
-			backgroundContainer.addChild(particle);
-			particles.push({
-				graphics: particle,
-				vx: (Math.random() - 0.5) * 0.3,
-				vy: (Math.random() - 0.5) * 0.3,
-				baseX: x,
-				baseY: y,
+			// Slow pulse for bright stars
+			gsap.to(star.scale, {
+				x: 1.3,
+				y: 1.3,
+				duration: 2 + Math.random() * 2,
+				ease: 'sine.inOut',
+				yoyo: true,
+				repeat: -1,
+				delay: Math.random() * 2,
 			});
 		}
 
+		// ========== FLOATING DUST PARTICLES ==========
+		const dustParticles: { graphics: Graphics; vx: number; vy: number }[] = [];
+		const dustCount = isMobile ? 15 : 30;
+
+		for (let i = 0; i < dustCount; i++) {
+			const dust = new Graphics();
+			const size = Math.random() * 2 + 1;
+			const colorIndex = Math.floor(Math.random() * nebulaColors.length);
+			const color = nebulaColors[colorIndex].color;
+
+			// Soft glowing particle
+			dust
+				.circle(0, 0, size + 4)
+				.fill({ color: color, alpha: 0.05 });
+			dust
+				.circle(0, 0, size + 2)
+				.fill({ color: color, alpha: 0.08 });
+			dust
+				.circle(0, 0, size)
+				.fill({ color: color, alpha: 0.15 });
+
+			dust.x = Math.random() * screenWidth;
+			dust.y = Math.random() * screenHeight;
+			starContainer.addChild(dust);
+
+			dustParticles.push({
+				graphics: dust,
+				vx: (Math.random() - 0.5) * 0.2,
+				vy: (Math.random() - 0.5) * 0.2,
+			});
+
+			// Fade in and out
+			gsap.to(dust, {
+				alpha: 0.3,
+				duration: 3 + Math.random() * 2,
+				ease: 'sine.inOut',
+				yoyo: true,
+				repeat: -1,
+				delay: Math.random() * 2,
+			});
+		}
+
+		// Animate dust particles drifting
 		app.ticker.add(() => {
-			particles.forEach((p) => {
+			dustParticles.forEach((p) => {
 				p.graphics.x += p.vx;
 				p.graphics.y += p.vy;
 
-				if (p.graphics.x < -50) p.graphics.x = app.screen.width + 50;
-				if (p.graphics.x > app.screen.width + 50) p.graphics.x = -50;
-				if (p.graphics.y < -50) p.graphics.y = app.screen.height + 50;
-				if (p.graphics.y > app.screen.height + 50) p.graphics.y = -50;
+				// Wrap around screen edges
+				if (p.graphics.x < -20) p.graphics.x = screenWidth + 20;
+				if (p.graphics.x > screenWidth + 20) p.graphics.x = -20;
+				if (p.graphics.y < -20) p.graphics.y = screenHeight + 20;
+				if (p.graphics.y > screenHeight + 20) p.graphics.y = -20;
 			});
 		});
 
-		// Vignette
+		// ========== VIGNETTE OVERLAY ==========
 		const vignette = new Graphics();
-		const vignetteSize = Math.max(app.screen.width, app.screen.height);
+		const vignetteSize = Math.max(screenWidth, screenHeight) * 1.2;
 
-		for (let i = 20; i >= 0; i--) {
-			const ratio = i / 20;
-			const alpha = ratio * ratio * 0.7;
+		for (let i = 12; i >= 0; i--) {
+			const ratio = i / 12;
+			const radius = vignetteSize * (0.4 + ratio * 0.6);
+			const alpha = ratio * ratio * 0.4;
+
 			vignette
-				.circle(app.screen.width / 2, app.screen.height / 2, vignetteSize * (0.5 + ratio * 0.5))
-				.fill({ color: 0x000000, alpha: alpha * 0.1 });
+				.circle(centerX, centerY, radius)
+				.fill({ color: 0x000000, alpha: alpha });
 		}
-		backgroundContainer.addChild(vignette);
+		app.stage.addChild(vignette);
 
 		// ========== TREE CONTAINER ==========
 		const treeContainer = new Container();
@@ -416,7 +599,7 @@
 		// ========== DRAW NODES ==========
 		const nodeObjects: { graphics: Graphics | Container; node: TreeNode; glowGraphics: Graphics }[] = [];
 
-		const profileTexture = await Assets.load('/profile.jpg');
+		const profileTexture = await Assets.load('/headshot.jpg');
 
 		for (const node of treeNodes) {
 			const radius = getNodeRadius(node.size);
