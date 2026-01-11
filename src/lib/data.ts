@@ -16,10 +16,21 @@ export interface TreeNode {
 	endDate?: string;  // Use "Present" for current role
 	highlights?: string[];  // Key achievements or responsibilities
 
-	// ========== PROJECT-SPECIFIC FIELDS ==========
+	// ========== CONTRACT-SPECIFIC FIELDS ==========
+	contractName?: string;
+	client?: string;
+	contractStart?: string;
+	contractEnd?: string;
+
+	// ========== PROJECT-SPECIFIC FIELDS (extended) ==========
 	techStack?: string[];
 	projectUrl?: string;
 	repoUrl?: string;
+	npmUrl?: string;        // For npm packages
+	pypiUrl?: string;       // For PyPI packages
+	downloads?: string;     // "1,000+ downloads"
+	stars?: number;         // GitHub stars
+	status?: 'active' | 'maintained' | 'archived';
 
 	// ========== SKILL-SPECIFIC FIELDS ==========
 	proficiency?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
@@ -39,6 +50,7 @@ export interface TreeNode {
 	linkedIn?: string;
 	github?: string;
 	website?: string;
+	resumeUrl?: string;
 }
 
 // The center of our tree is at (0, 0)
@@ -65,9 +77,10 @@ export const treeNodes: TreeNode[] = [
 		linkedIn: 'https://www.linkedin.com/in/kevinriehl',
 		github: 'https://github.com/TehRiehlDeal',
 		website: 'https://tehriehldeal.com',
+		resumeUrl: '/kevin-riehl-resume.pdf',
 	},
 
-	// ========== EXPERIENCE (Upper Right - Timeline Path) ==========
+	// ========== EXPERIENCE (Upper Right - Contract-Based) ==========
 	{
 		id: 'exp-branch',
 		label: 'Experience',
@@ -79,13 +92,32 @@ export const treeNodes: TreeNode[] = [
 		size: 'large',
 		icon: '/icons/experience.svg',
 	},
+	
+	// Contract Parent Node
+	{
+		id: 'exp-contract',
+		label: 'DHA - Web and Mobile Technology',
+		description: 'Continuous work supporting the same government client through multiple contracting companies as the contract was re-competed and awarded.',
+		x: 320,
+		y: -220,
+		parentId: 'exp-branch',
+		category: 'experience',
+		size: 'medium',
+		icon: '/icons/contract.svg',
+		contractName: 'DHA WMT',
+		client: 'Defense Health Agency',
+		contractStart: 'October 2020',
+		contractEnd: 'Present',
+	},
+	
+	// Job 1 - First company (starting point of the arc)
 	{
 		id: 'exp-job1',
 		label: 'Software Engineer',
 		description: 'Junior developer at the start of my career.',
-		x: 300,
-		y: -200,
-		parentId: 'exp-branch',
+		x: 420,
+		y: -280,
+		parentId: 'exp-contract',
 		category: 'experience',
 		size: 'small',
 		icon: '/icons/insightglobal.webp',
@@ -98,12 +130,14 @@ export const treeNodes: TreeNode[] = [
 			'Executed a critical database migration from MySQL to MSSQL, ensuring data integrity during the transfer and optimizing schema definitions for the new environment',
 		],
 	},
+	
+	// Job 2 - Arc continues upward
 	{
 		id: 'exp-job2',
 		label: 'Software Engineer',
-		description: 'Slightly more experienced still early in my career.',
-		x: 400,
-		y: -280,
+		description: 'Growing my skills and taking on more responsibility.',
+		x: 500,
+		y: -350,
 		parentId: 'exp-job1',
 		category: 'experience',
 		size: 'small',
@@ -118,12 +152,14 @@ export const treeNodes: TreeNode[] = [
 			'Supported engineering team growth by conducting code reviews and leading the onboarding process for new developers, ensuring smooth knowledge transfer and adherence to coding standards',
 		],
 	},
+	
+	// Job 3 - Peak of the arc
 	{
 		id: 'exp-job3',
 		label: 'Intermediate Software Engineer',
 		description: 'Stepping into a more senior role.',
-		x: 500,
-		y: -220,
+		x: 560,
+		y: -430,
 		parentId: 'exp-job2',
 		category: 'experience',
 		size: 'small',
@@ -138,12 +174,14 @@ export const treeNodes: TreeNode[] = [
 			"Supported the engineering team's migration to containerized workflows by configuring, testing, and troubleshooting custom Docker environments, ensuring consistent application behavior across development and production",
 		],
 	},
+	
+	// Job 4 - Continuing upward and right
 	{
 		id: 'exp-job4',
 		label: 'Intermediate Software Engineer',
 		description: 'Where one journey ends, another begins.',
-		x: 580,
-		y: -300,
+		x: 600,
+		y: -510,
 		parentId: 'exp-job3',
 		category: 'experience',
 		size: 'small',
@@ -158,12 +196,14 @@ export const treeNodes: TreeNode[] = [
 			'Engineered adaptive network logic that monitors packet loss in real-time and dynamically adjusts video stream quality, ensuring connection stability and optimal user experience during bandwidth fluctuations',
 		],
 	},
+	
+	// Job 5 - Current (highest point, prominent)
 	{
 		id: 'exp-job5',
 		label: 'Lead Associate',
 		description: 'Where I am now.',
-		x: 650,
-		y: -380,
+		x: 620,
+		y: -590,
 		parentId: 'exp-job4',
 		category: 'experience',
 		size: 'medium',
@@ -177,37 +217,104 @@ export const treeNodes: TreeNode[] = [
 		],
 	},
 
-	// ========== PROJECTS (Top Left Quadrant) ==========
+	// ========== PROJECTS (Upper Left Quadrant) ==========
 	{
 		id: 'proj-branch',
 		label: 'Projects',
-		description: 'Things I have built.',
-		x: -150,
-		y: -100,
+		description: 'Personal projects and open-source contributions.',
+		x: -200,
+		y: -150,
 		parentId: 'origin',
 		category: 'projects',
 		size: 'large',
-		icon: '/icons/projects.svg'
+		icon: '/icons/projects.svg',
 	},
+
+	// Open Source Libraries
 	{
-		id: 'proj-1',
-		label: 'Portfolio Site',
-		description: 'This very skill tree you are exploring right now!',
-		x: -300,
-		y: -180,
+		id: 'proj-opensource',
+		label: 'Open Source',
+		description: 'Published packages and libraries available for the community.',
+		x: -350,
+		y: -220,
 		parentId: 'proj-branch',
 		category: 'projects',
-		size: 'small',
+		size: 'medium',
+		icon: '/icons/opensource.svg',
 	},
+
+	// Personal Tools
 	{
-		id: 'proj-2',
-		label: 'Side Project',
-		description: 'A passion project I built to learn new technologies.',
-		x: -320,
+		id: 'proj-tools',
+		label: 'Personal Tools',
+		description: 'Applications built to solve real problems.',
+		x: -350,
 		y: -80,
 		parentId: 'proj-branch',
 		category: 'projects',
+		size: 'medium',
+		icon: '/icons/tools.svg',
+	},
+
+	// ========== OPEN SOURCE CHILDREN ==========
+	{
+		id: 'proj-tvdbapi',
+		label: 'tvdbAPI',
+		description: 'Python library for accessing The TVDB API. Fetch show info, episodes, actors, and images with a simple interface. Published on PyPI.',
+		x: -420,
+		y: -310,
+		parentId: 'proj-opensource',
+		category: 'projects',
 		size: 'small',
+		icon: '/icons/python.svg',
+		techStack: ['Python', 'REST API', 'PyPI', 'GitHub Actions', 'Unit Testing'],
+		repoUrl: 'https://github.com/TehRiehlDeal/TVDB-API',
+		pypiUrl: 'https://pypi.org/project/tvdbAPI/',
+		status: 'maintained'
+	},
+	{
+		id: 'proj-tmdbapi',
+		label: 'tmdbAPI',
+		description: 'Python library for The Movie Database API. Search for movies, TV shows, actors, and collections with comprehensive query options.',
+		x: -500,
+		y: -250,
+		parentId: 'proj-opensource',
+		category: 'projects',
+		size: 'small',
+		icon: '/icons/python.svg',
+		techStack: ['Python', 'REST API', 'PyPI', 'GitHub Actions', 'Unit Testing'],
+		repoUrl: 'https://github.com/TehRiehlDeal/tmdbAPI',
+		pypiUrl: 'https://pypi.org/project/tvdbAPI/',
+		status: 'maintained'
+	},
+
+	// ========== PERSONAL TOOLS CHILDREN ==========
+	{
+		id: 'proj-renameshow',
+		label: 'Rename Show',
+		description: 'Desktop application for batch renaming TV show files using metadata from TVDB and TMDB. Features undo support, multi-episode detection, and automatic show searching.',
+		x: -450,
+		y: -130,
+		parentId: 'proj-tools',
+		category: 'projects',
+		size: 'small',
+		icon: '/icons/desktop.svg',
+		techStack: ['Python', 'Tkinter', 'tvdbAPI', 'tmdbAPI', 'PIL'],
+		repoUrl: 'https://github.com/TehRiehlDeal/python-file-rename',
+	},
+	{
+		id: 'proj-portfolio',
+		label: 'Skill Tree Portfolio',
+		description: 'This interactive portfolio you\'re exploring right now! A Path of Exile inspired skill tree built with modern web technologies.',
+		x: -450,
+		y: -50,
+		parentId: 'proj-tools',
+		category: 'projects',
+		size: 'small',
+		icon: '/icons/svelte.svg',
+		techStack: ['SvelteKit', 'TypeScript', 'PixiJS', 'GSAP', 'Tailwind CSS'],
+		projectUrl: 'https://yourportfolio.com',
+		repoUrl: 'https://github.com/yourusername/skill-tree-portfolio',
 	},
 
 	// ========== SKILLS (Bottom Right Quadrant) ==========
