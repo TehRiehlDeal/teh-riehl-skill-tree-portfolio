@@ -7,6 +7,7 @@
 	let container: HTMLDivElement;
 	let selectedNode: TreeNode | null = null;
 	let modalVisible = false;
+	let showWelcomeTitle = true;
 
 	// Tooltip state
 	let hoveredNode: TreeNode | null = null;
@@ -365,8 +366,16 @@
 		const treeContainer = new Container();
 		app.stage.addChild(treeContainer);
 
+		// Initial position (centered)
 		treeContainer.x = app.screen.width / 2;
 		treeContainer.y = app.screen.height / 2;
+
+		// Start zoomed in - will zoom out after welcome title
+		// Mobile needs to zoom out further to show more of the tree
+		const startScale = isMobile ? 3 : 4;
+		const endScale = isMobile ? 0.6 : 1;
+		treeContainer.scale.set(startScale);
+		treeContainer.alpha = 1; // Tree is visible but zoomed in
 
 		// ========== PAN & ZOOM STATE ==========
 		let isDragging = false;
@@ -743,59 +752,161 @@
 			}
 		}
 
-		// ========== ENTRANCE ANIMATIONS ==========
-		lineObjects
-			.sort((a, b) => getDistanceFromOrigin(a.node) - getDistanceFromOrigin(b.node))
-			.forEach((line, index) => {
-				gsap.to(line.graphics, {
-					alpha: 1,
-					duration: 0.4,
-					delay: index * 0.06,
-					ease: 'power2.out',
-				});
-				gsap.to(line.glowGraphics, {
-					alpha: 1,
-					duration: 0.6,
-					delay: index * 0.06 + 0.1,
-					ease: 'power2.out',
-				});
+		// ========== ENTRANCE ANIMATIONS (Sequenced) ==========
+		
+		// Timeline:
+		// 0.0s - 2.5s: Welcome title displays (handled by CSS)
+		// 2.5s: Title starts fading, origin node appears
+		// 3.0s: Zoom out begins, tree starts populating
+		// 6.0s: Animation complete
+		
+		// Responsive animation timing
+		const titleDuration = isMobile ? 1.5 : 2.5;
+		const zoomDuration = isMobile ? 2.5 : 4.5;
+		const nodeStagger = isMobile ? 0.05 : 0.08;
+		
+		// Hide all lines initially
+		lineObjects.forEach((line) => {
+			line.graphics.alpha = 0;
+			line.glowGraphics.alpha = 0;
+		});
+		
+		// Hide all nodes initially
+		nodeObjects.forEach((obj) => {
+			obj.graphics.alpha = 0;
+			obj.graphics.scale.set(0.5);
+			obj.glowGraphics.alpha = 0;
+		});
+		
+		// Sort nodes by distance from origin
+		const sortedNodes = [...nodeObjects].sort(
+			(a, b) => getDistanceFromOrigin(a.node) - getDistanceFromOrigin(b.node)
+		);
+		
+		const sortedLines = [...lineObjects].sort(
+			(a, b) => getDistanceFromOrigin(a.node) - getDistanceFromOrigin(b.node)
+		);
+		
+		// STEP 1: After title fades, show origin node first
+		// On mobile, start origin animation BEFORE title fully fades (overlap them)
+		const originNode = sortedNodes.find(obj => obj.node.id === 'origin');
+		const originDelay = isMobile ? titleDuration - 0.5 : titleDuration;
+		const originDuration = isMobile ? 0.3 : 0.6;
+
+		// Pre-set origin node to be ready (reduces perceived delay on mobile)
+		if (originNode && isMobile) {
+			originNode.graphics.scale.set(0.8); // Start slightly larger
+		}
+		
+		if (originNode) {
+			gsap.to(originNode.graphics, {
+				alpha: 1,
+				duration: originDuration,
+				delay: originDelay,
+				ease: 'power2.out',
 			});
-
-		nodeObjects
-			.sort((a, b) => getDistanceFromOrigin(a.node) - getDistanceFromOrigin(b.node))
-			.forEach((obj, index) => {
-				const delay = index * 0.06;
-
-				gsap.to(obj.graphics, {
-					alpha: 1,
-					duration: 0.5,
-					delay: delay,
-					ease: 'back.out(1.7)',
-				});
-				gsap.to(obj.graphics.scale, {
-					x: 1,
-					y: 1,
-					duration: 0.5,
-					delay: delay,
-					ease: 'back.out(1.7)',
-				});
-				gsap.to(obj.glowGraphics, {
-					alpha: 1,
-					duration: 0.5,
-					delay: delay,
-					ease: 'power2.out',
-				});
-
-				gsap.to(obj.glowGraphics.scale, {
-					x: 1.4,
-					y: 1.4,
-					duration: 2 + Math.random() * 1,
-					delay: delay + 0.8,
-					ease: 'sine.inOut',
-					yoyo: true,
-					repeat: -1,
-				});
+			gsap.to(originNode.graphics.scale, {
+				x: 1,
+				y: 1,
+				duration: originDuration,
+				delay: originDelay,
+				ease: 'back.out(1.7)',
 			});
+			gsap.to(originNode.glowGraphics, {
+				alpha: 1,
+				duration: originDuration,
+				delay: originDelay,
+				ease: 'power2.out',
+			});
+		}
+		
+		// STEP 2: Start zoom out after origin appears
+		const zoomDelay = isMobile ? titleDuration - 0.3 : titleDuration + 0.3;
+		
+		gsap.to(treeContainer.scale, {
+			x: endScale,
+			y: endScale,
+			duration: zoomDuration,
+			delay: zoomDelay,
+			ease: 'power1.out',
+		});
+		
+		// STEP 3: Animate in the rest of the nodes (excluding origin)
+		const otherNodes = sortedNodes.filter(obj => obj.node.id !== 'origin');
+		const nodeStartDelay = isMobile ? titleDuration - 0.2 : titleDuration + 0.5;
+		
+		otherNodes.forEach((obj, index) => {
+			const delay = nodeStartDelay + (index * nodeStagger);
+			
+			gsap.to(obj.graphics, {
+				alpha: 1,
+				duration: 0.5,
+				delay: delay,
+				ease: 'power2.out',
+			});
+			gsap.to(obj.graphics.scale, {
+				x: 1,
+				y: 1,
+				duration: 0.5,
+				delay: delay,
+				ease: 'back.out(1.7)',
+			});
+			gsap.to(obj.glowGraphics, {
+				alpha: 1,
+				duration: 0.5,
+				delay: delay,
+				ease: 'power2.out',
+			});
+			
+			// Start ambient pulse after node appears
+			gsap.to(obj.glowGraphics.scale, {
+				x: 1.4,
+				y: 1.4,
+				duration: 2 + Math.random() * 1,
+				delay: delay + 0.5,
+				ease: 'sine.inOut',
+				yoyo: true,
+				repeat: -1,
+			});
+		});
+		
+		// Start origin pulse too
+		if (originNode) {
+			gsap.to(originNode.glowGraphics.scale, {
+				x: 1.4,
+				y: 1.4,
+				duration: 2 + Math.random() * 1,
+				delay: titleDuration + 1,
+				ease: 'sine.inOut',
+				yoyo: true,
+				repeat: -1,
+			});
+		}
+		
+		// STEP 4: Animate lines as nodes appear
+		const lineStartDelay = isMobile ? titleDuration - 0.3 : titleDuration + 0.4;
+		
+		sortedLines.forEach((line, index) => {
+			const delay = lineStartDelay + (index * nodeStagger);
+			
+			gsap.to(line.graphics, {
+				alpha: 1,
+				duration: 0.4,
+				delay: delay,
+				ease: 'power2.out',
+			});
+			gsap.to(line.glowGraphics, {
+				alpha: 1,
+				duration: 0.6,
+				delay: delay + 0.1,
+				ease: 'power2.out',
+			});
+		});
+			
+		// Clean up title card after animation (matches titleDuration)
+		setTimeout(() => {
+			showWelcomeTitle = false;
+		}, isMobile ? 1500 : 2500);
 
 		console.log('✨ Responsive skill tree loaded!');
 
@@ -827,6 +938,14 @@
 <svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
 
 <div bind:this={container} class="canvas-container"></div>
+
+<!-- Welcome Title Card -->
+{#if showWelcomeTitle}
+	<div class="welcome-title" class:fade-out={!showWelcomeTitle}>
+		<h1>Kevin Riehl</h1>
+		<p>The Atlas of Skills</p>
+	</div>
+{/if}
 
 <!-- Hover Tooltip (hidden on mobile) -->
 {#if hoveredNode && !modalVisible && !isMobile}
@@ -1395,5 +1514,97 @@
 	.status-badge.archived {
 		background: #4a5568;
 		color: #e2e8f0;
+	}
+
+	.welcome-title {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		text-align: center;
+		z-index: 100;
+		pointer-events: none;
+		animation: titleFadeInOut 2.5s ease-in-out forwards;
+	}
+
+	@media (max-width: 767px) {
+		.welcome-title {
+			animation: titleFadeInOutMobile 1.5s ease-in-out forwards;
+		}
+
+		.welcome-title h1 {
+			font-size: 1.8rem;
+		}
+
+		.welcome-title p {
+			font-size: 0.8rem;
+		}
+	}
+
+	@keyframes titleFadeInOutMobile {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, -50%) scale(0.9);
+		}
+		25% {
+			opacity: 1;
+			transform: translate(-50%, -50%) scale(1);
+		}
+		75% {
+			opacity: 1;
+			transform: translate(-50%, -50%) scale(1);
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, -50%) scale(1.05);
+		}
+	}
+
+	.welcome-title h1 {
+		font-size: 2.5rem;
+		color: #ffd700;
+		margin: 0;
+		text-shadow: 
+			0 0 20px rgba(255, 215, 0, 0.8),
+			0 0 40px rgba(255, 215, 0, 0.5),
+			0 0 60px rgba(255, 215, 0, 0.3);
+		letter-spacing: 0.1em;
+	}
+
+	.welcome-title p {
+		font-size: 1rem;
+		color: #a8a8b8;
+		margin: 0.5rem 0 0 0;
+		text-transform: uppercase;
+		letter-spacing: 0.3em;
+	}
+
+	@keyframes titleFadeInOut {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, -50%) scale(0.9);
+		}
+		20% {
+			opacity: 1;
+			transform: translate(-50%, -50%) scale(1);
+		}
+		85% {
+			opacity: 1;
+			transform: translate(-50%, -50%) scale(1);
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, -50%) scale(1.05);
+		}
+	}
+
+	@media (max-width: 767px) {
+		.welcome-title h1 {
+			font-size: 1.8rem;
+		}
+
+		.welcome-title p {
+			font-size: 0.8rem;
+		}
 	}
 </style>
