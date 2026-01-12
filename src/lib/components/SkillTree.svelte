@@ -966,14 +966,27 @@
 				</div>
 			{/if}
 
+			<!-- Project status badge -->
+			{#if selectedNode.status}
+				<div class="project-status">
+					<span class="status-badge {selectedNode.status}">{selectedNode.status}</span>
+				</div>
+			{/if}
+
 			<!-- Links (for projects) -->
-			{#if selectedNode.projectUrl || selectedNode.repoUrl}
+			{#if selectedNode.projectUrl || selectedNode.repoUrl || selectedNode.pypiUrl || selectedNode.npmUrl}
 				<div class="links">
 					{#if selectedNode.projectUrl}
 						<a href={selectedNode.projectUrl} target="_blank" rel="noopener noreferrer">🔗 Live Site</a>
 					{/if}
 					{#if selectedNode.repoUrl}
 						<a href={selectedNode.repoUrl} target="_blank" rel="noopener noreferrer">💻 Repository</a>
+					{/if}
+					{#if selectedNode.pypiUrl}
+						<a href={selectedNode.pypiUrl} target="_blank" rel="noopener noreferrer">📦 PyPI</a>
+					{/if}
+					{#if selectedNode.npmUrl}
+						<a href={selectedNode.npmUrl} target="_blank" rel="noopener noreferrer">📦 npm</a>
 					{/if}
 				</div>
 			{/if}
@@ -1348,5 +1361,39 @@
 
 	.resume-button:active {
 		transform: translateY(0);
+	}
+
+	.project-status {
+		margin: 0.75rem 0;
+	}
+
+	.status-badge {
+		display: inline-block;
+		padding: 0.25rem 0.6rem;
+		border-radius: 4px;
+		font-size: 0.7rem;
+		font-weight: bold;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.status-badge.active {
+		background: #2f855a;
+		color: #c6f6d5;
+	}
+
+	.status-badge.maintained {
+		background: #2b6cb0;
+		color: #bee3f8;
+	}
+
+	.status-badge.completed {
+		background: #6b5b95;
+		color: #e2d8f0;
+	}
+
+	.status-badge.archived {
+		background: #4a5568;
+		color: #e2e8f0;
 	}
 </style>

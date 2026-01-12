@@ -30,7 +30,7 @@ export interface TreeNode {
 	pypiUrl?: string;       // For PyPI packages
 	downloads?: string;     // "1,000+ downloads"
 	stars?: number;         // GitHub stars
-	status?: 'active' | 'maintained' | 'archived';
+	status?: 'active' | 'maintained' | 'archived' | 'completed';
 
 	// ========== SKILL-SPECIFIC FIELDS ==========
 	proficiency?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
@@ -313,7 +313,7 @@ export const treeNodes: TreeNode[] = [
 		size: 'small',
 		icon: '/icons/svelte.svg',
 		techStack: ['SvelteKit', 'TypeScript', 'PixiJS', 'GSAP', 'Tailwind CSS'],
-		projectUrl: 'https://yourportfolio.com',
+		projectUrl: 'https://tehriehldeal.com',
 		repoUrl: 'https://github.com/yourusername/skill-tree-portfolio',
 	},
 
