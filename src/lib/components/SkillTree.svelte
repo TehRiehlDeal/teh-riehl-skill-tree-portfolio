@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { slide } from 'svelte/transition';
 	import { Application, Graphics, Container, Assets, Sprite } from 'pixi.js';
 	import { gsap } from 'gsap';
 	import { treeNodes, categoryColors, type TreeNode } from '$lib/data';
@@ -20,6 +21,16 @@
 	let windowHeight = 0;
 
 	let modalOpenedAt = 0;
+
+	// Stats panel state
+	let statsPanelVisible = false;
+	let expandedBranches = new Set<string>([
+		'concepts',
+		'tools-devops',
+		'frontend',
+		'backend-real-time',
+		'languages'
+	]); // All expanded by default
 
 	function openModal(node: TreeNode) {
 		selectedNode = node;
@@ -52,6 +63,90 @@
 		};
 		return colorMap[category];
 	}
+
+	// Helper functions for stats panel
+	function calculatePlayerLevel(): number {
+		// Find earliest start date from experience nodes
+		const earliestStart = new Date('2020-10-01'); // First job
+		const now = new Date();
+		const millisPerYear = 1000 * 60 * 60 * 24 * 365.25;
+		const years = (now.getTime() - earliestStart.getTime()) / millisPerYear;
+		return Math.floor(years);
+	}
+
+	function getPlayerClass(): string {
+		const originNode = treeNodes.find((node) => node.id === 'origin');
+		return originNode?.jobTitle || 'Software Engineer';
+	}
+
+	function aggregateSkills() {
+		const branchIds = ['concepts', 'tools-devops', 'frontend', 'backend-real-time', 'languages'];
+		const branchLabels: Record<string, string> = {
+			concepts: 'Concepts',
+			'tools-devops': 'Tools & DevOps',
+			frontend: 'Frontend',
+			'backend-real-time': 'Backend & Real-Time',
+			languages: 'Languages'
+		};
+
+		const result: Record<string, { label: string; skills: TreeNode[] }> = {};
+
+		branchIds.forEach((branchId) => {
+			const skills = treeNodes.filter(
+				(node) => node.parentId === branchId && node.category === 'skills'
+			);
+
+			// Sort by proficiency (expert > advanced > intermediate > beginner)
+			const proficiencyOrder: Record<string, number> = {
+				expert: 0,
+				advanced: 1,
+				intermediate: 2,
+				beginner: 3
+			};
+			skills.sort((a, b) => {
+				const aOrder = proficiencyOrder[a.proficiency || 'beginner'];
+				const bOrder = proficiencyOrder[b.proficiency || 'beginner'];
+				return aOrder - bOrder;
+			});
+
+			result[branchId] = { label: branchLabels[branchId], skills };
+		});
+
+		return result;
+	}
+
+	function countByProficiency() {
+		const counts = { expert: 0, advanced: 0, intermediate: 0, beginner: 0 };
+		treeNodes.forEach((node) => {
+			if (node.proficiency) {
+				counts[node.proficiency]++;
+			}
+		});
+		return counts;
+	}
+
+	function toggleStatsPanel() {
+		statsPanelVisible = !statsPanelVisible;
+		if (statsPanelVisible && modalVisible) {
+			closeModal(); // Close modal when opening stats panel
+		}
+	}
+
+	function toggleBranch(branchId: string) {
+		if (expandedBranches.has(branchId)) {
+			expandedBranches.delete(branchId);
+		} else {
+			expandedBranches.add(branchId);
+		}
+		expandedBranches = expandedBranches; // Trigger reactivity
+	}
+
+	// Stats calculations (reactive)
+	$: playerLevel = calculatePlayerLevel();
+	$: playerClass = getPlayerClass();
+	$: skillsByBranch = aggregateSkills();
+	$: skillCounts = countByProficiency();
+	$: totalSkills = Object.values(skillCounts).reduce((sum, count) => sum + count, 0);
 
 	// Update screen size
 	function handleResize() {
@@ -908,10 +1003,43 @@
 			showWelcomeTitle = false;
 		}, isMobile ? 1500 : 2500);
 
+		// Fade in stats panel toggle button with the tree
+		const toggleButton = document.querySelector('.stats-panel-toggle');
+		if (toggleButton) {
+			gsap.to(toggleButton, {
+				opacity: 1,
+				duration: 0.5,
+				delay: nodeStartDelay + (otherNodes.length * nodeStagger * 0.5), // Fade in midway through node animation
+				ease: 'power2.out',
+			});
+		}
+
+		// Keyboard event handler for stats panel
+		function handleKeydown(e: KeyboardEvent) {
+			// Toggle stats panel with 'C' key
+			if (e.key === 'c' || e.key === 'C') {
+				if (!modalVisible) {
+					toggleStatsPanel();
+				}
+			}
+
+			// Escape key priority: modal > stats panel
+			if (e.key === 'Escape') {
+				if (modalVisible) {
+					closeModal();
+				} else if (statsPanelVisible) {
+					toggleStatsPanel();
+				}
+			}
+		}
+
+		window.addEventListener('keydown', handleKeydown);
+
 		console.log('✨ Responsive skill tree loaded!');
 
 		return () => {
 			window.removeEventListener('resize', handleResize);
+			window.removeEventListener('keydown', handleKeydown);
 		};
 	});
 
@@ -1112,6 +1240,121 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Stats Panel Toggle Button -->
+<button
+	class="stats-panel-toggle"
+	class:open={statsPanelVisible}
+	on:click={toggleStatsPanel}
+	title="Character Stats (C)"
+	aria-label="Toggle Character Stats Panel (Keyboard shortcut: C)"
+>
+	⚙️
+</button>
+
+<!-- Stats Panel Backdrop -->
+{#if statsPanelVisible}
+	<div class="stats-panel-backdrop visible" on:click={toggleStatsPanel}></div>
+{/if}
+
+<!-- Stats Panel -->
+<div class="stats-panel" class:visible={statsPanelVisible} role="complementary" aria-label="Character Statistics">
+	<!-- Character Card -->
+	<div class="character-card">
+		<img src="/headshot.jpg" alt="Character Portrait" class="character-portrait" />
+
+		<div class="character-stats-bar">
+			<div class="stat-item">
+				<span>⚔️</span>
+				<span class="stat-label">LVL</span>
+				<span>{playerLevel}</span>
+			</div>
+		</div>
+
+		<h1 class="character-name">Kevin Riehl</h1>
+		<p class="character-title">{playerClass}</p>
+	</div>
+
+	<!-- Skills Section -->
+	<div class="skills-section">
+		<!-- Proficiency Summary -->
+		<div class="proficiency-summary">
+			<h3>⚡ Skill Mastery</h3>
+			<div class="proficiency-row">
+				<span class="proficiency-label">⭐⭐⭐ Expert</span>
+				<span class="proficiency-count">{skillCounts.expert}</span>
+			</div>
+			<div class="proficiency-row">
+				<span class="proficiency-label">⭐⭐ Advanced</span>
+				<span class="proficiency-count">{skillCounts.advanced}</span>
+			</div>
+			<div class="proficiency-row">
+				<span class="proficiency-label">⭐ Intermediate</span>
+				<span class="proficiency-count">{skillCounts.intermediate}</span>
+			</div>
+			<div class="proficiency-row">
+				<span class="proficiency-label">Beginner</span>
+				<span class="proficiency-count">{skillCounts.beginner}</span>
+			</div>
+			<div
+				class="proficiency-row"
+				style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 0.5rem; padding-top: 0.5rem;"
+			>
+				<span class="proficiency-label">Total Skills</span>
+				<span class="proficiency-count">{totalSkills}</span>
+			</div>
+		</div>
+
+		<!-- Skill Branches -->
+		{#each Object.entries(skillsByBranch) as [branchId, branch]}
+			<div class="skill-branch">
+				<div
+					class="branch-header"
+					on:click={() => toggleBranch(branchId)}
+					on:keydown={(e) => e.key === 'Enter' && toggleBranch(branchId)}
+					tabindex="0"
+					role="button"
+					aria-expanded={expandedBranches.has(branchId)}
+				>
+					<img
+						src={treeNodes.find((n) => n.id === branchId)?.icon || ''}
+						alt=""
+						class="branch-icon"
+					/>
+					<span class="branch-title">{branch.label}</span>
+					<span class="branch-count">({branch.skills.length})</span>
+					<span class="expand-icon" class:expanded={expandedBranches.has(branchId)}>▼</span>
+				</div>
+
+				{#if expandedBranches.has(branchId)}
+					<div class="skill-list" transition:slide={{ duration: 300 }}>
+						{#each branch.skills as skill}
+							<div class="skill-item">
+								{#if skill.icon}
+									<img src={skill.icon} alt="" class="skill-item-icon" />
+								{/if}
+								<span class="skill-name">{skill.label}</span>
+								<span class="skill-proficiency">
+									{#if skill.proficiency === 'expert'}
+										<span class="proficiency-stars">⭐⭐⭐</span>
+									{:else if skill.proficiency === 'advanced'}
+										<span class="proficiency-stars">⭐⭐</span>
+									{:else if skill.proficiency === 'intermediate'}
+										<span class="proficiency-stars">⭐</span>
+									{/if}
+									<span>{skill.proficiency || ''}</span>
+								</span>
+								{#if skill.yearsOfExperience}
+									<span class="skill-years">{skill.yearsOfExperience}y</span>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/each}
+	</div>
+</div>
 
 <style>
 	.canvas-container {
@@ -1604,6 +1847,349 @@
 		}
 
 		.welcome-title p {
+			font-size: 0.8rem;
+		}
+	}
+
+	/* ========== STATS PANEL STYLES ========== */
+
+	/* Toggle Button */
+	.stats-panel-toggle {
+		position: fixed;
+		top: 20px;
+		left: 20px;
+		width: 48px;
+		height: 48px;
+		background: linear-gradient(145deg, #1a1a2e 0%, #0f0f1a 100%);
+		border: 2px solid #ffd700;
+		border-radius: 12px;
+		cursor: pointer;
+		z-index: 950;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 24px;
+		color: #ffd700;
+		box-shadow:
+			0 0 20px rgba(255, 215, 0, 0.3),
+			0 4px 12px rgba(0, 0, 0, 0.5);
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		opacity: 0;
+	}
+
+	.stats-panel-toggle:hover:not(.open) {
+		transform: scale(1.05);
+		box-shadow:
+			0 0 30px rgba(255, 215, 0, 0.5),
+			0 4px 16px rgba(0, 0, 0, 0.6);
+	}
+
+	.stats-panel-toggle.open:hover {
+		box-shadow:
+			0 0 30px rgba(255, 215, 0, 0.5),
+			0 4px 16px rgba(0, 0, 0, 0.6);
+	}
+
+	.stats-panel-toggle.open {
+		transform: translateX(380px) rotate(180deg);
+	}
+
+	/* Panel and Backdrop */
+	.stats-panel {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 380px;
+		height: 100vh;
+		background: linear-gradient(145deg, #1a1a2e 0%, #0f0f1a 100%);
+		border-right: 2px solid #ffd700;
+		box-shadow:
+			4px 0 40px rgba(255, 215, 0, 0.3),
+			8px 0 80px rgba(255, 215, 0, 0.15);
+		z-index: 900;
+		transform: translateX(-100%);
+		transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		overflow-y: auto;
+		overflow-x: hidden;
+		overscroll-behavior: contain;
+	}
+
+	/* Custom scrollbar styling for stats panel */
+	.stats-panel::-webkit-scrollbar {
+		width: 10px;
+	}
+
+	.stats-panel::-webkit-scrollbar-track {
+		background: rgba(0, 0, 0, 0.3);
+		border-left: 1px solid rgba(255, 215, 0, 0.1);
+	}
+
+	.stats-panel::-webkit-scrollbar-thumb {
+		background: linear-gradient(180deg, #ffd700 0%, #b7941f 100%);
+		border-radius: 5px;
+		border: 2px solid rgba(0, 0, 0, 0.3);
+	}
+
+	.stats-panel::-webkit-scrollbar-thumb:hover {
+		background: linear-gradient(180deg, #ffed4e 0%, #d4af37 100%);
+	}
+
+	.stats-panel.visible {
+		transform: translateX(0);
+	}
+
+	.stats-panel-backdrop {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		background: rgba(0, 0, 0, 0.5);
+		z-index: 899;
+		transition: opacity 0.2s ease;
+	}
+
+	/* Character Card */
+	.character-card {
+		padding: 2rem 1.5rem;
+		border-bottom: 2px solid rgba(255, 215, 0, 0.2);
+		text-align: center;
+	}
+
+	.character-portrait {
+		width: 120px;
+		height: 120px;
+		border-radius: 50%;
+		border: 3px solid #ffd700;
+		box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+		margin: 0 auto 1rem;
+		object-fit: cover;
+	}
+
+	.character-stats-bar {
+		display: flex;
+		justify-content: center;
+		gap: 2rem;
+		margin-bottom: 1rem;
+		font-size: 0.9rem;
+		color: #a8a8b8;
+	}
+
+	.stat-item {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.stat-label {
+		font-weight: bold;
+		color: #ffd700;
+		text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+	}
+
+	.character-name {
+		font-size: 1.4rem;
+		font-weight: bold;
+		color: #ffd700;
+		text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+		margin-bottom: 0.25rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+	}
+
+	.character-title {
+		font-size: 0.85rem;
+		color: #a8a8b8;
+		font-style: italic;
+	}
+
+	/* Skills Section */
+	.skills-section {
+		padding: 1.5rem;
+	}
+
+	.proficiency-summary {
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(255, 215, 0, 0.2);
+		border-radius: 8px;
+		padding: 1rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.proficiency-summary h3 {
+		color: #ffd700;
+		font-size: 0.9rem;
+		margin-bottom: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.proficiency-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.4rem 0;
+		font-size: 0.85rem;
+	}
+
+	.proficiency-label {
+		color: #e0e0e0;
+	}
+
+	.proficiency-count {
+		color: #ffd700;
+		font-weight: bold;
+	}
+
+	.skill-branch {
+		margin-bottom: 1.5rem;
+	}
+
+	.branch-header {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem;
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.branch-header:hover {
+		background: rgba(255, 255, 255, 0.08);
+		border-color: rgba(255, 215, 0, 0.3);
+	}
+
+	.branch-icon {
+		width: 32px;
+		height: 32px;
+		filter: drop-shadow(0 0 8px rgba(249, 168, 37, 0.5));
+	}
+
+	.branch-title {
+		flex: 1;
+		font-size: 1rem;
+		font-weight: bold;
+		color: #f9a825;
+		text-shadow: 0 0 10px rgba(249, 168, 37, 0.3);
+	}
+
+	.branch-count {
+		font-size: 0.8rem;
+		color: #888;
+	}
+
+	.expand-icon {
+		font-size: 0.8rem;
+		color: #666;
+		transition: transform 0.2s ease;
+	}
+
+	.expand-icon.expanded {
+		transform: rotate(180deg);
+	}
+
+	.skill-list {
+		margin-top: 0.5rem;
+		padding-left: 1rem;
+		overflow: hidden;
+	}
+
+	.skill-item {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 0.75rem;
+		margin-bottom: 0.25rem;
+		background: rgba(0, 0, 0, 0.2);
+		border-radius: 6px;
+		border-left: 3px solid transparent;
+		transition: all 0.15s ease;
+	}
+
+	.skill-item:hover {
+		background: rgba(255, 255, 255, 0.05);
+		border-left-color: #f9a825;
+	}
+
+	.skill-item-icon {
+		width: 20px;
+		height: 20px;
+		opacity: 0.8;
+	}
+
+	.skill-name {
+		flex: 1;
+		font-size: 0.85rem;
+		color: #e0e0e0;
+	}
+
+	.skill-proficiency {
+		font-size: 0.7rem;
+		color: #a8a8b8;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.proficiency-stars {
+		color: #ffd700;
+		font-size: 0.75rem;
+	}
+
+	.skill-years {
+		font-size: 0.7rem;
+		color: #666;
+		margin-left: 0.5rem;
+	}
+
+	/* Mobile Responsive */
+	@media (max-width: 767px) {
+		.stats-panel-toggle {
+			bottom: 20px;
+			left: 20px;
+			top: auto;
+			width: 44px;
+			height: 44px;
+			font-size: 22px;
+		}
+
+		.stats-panel-toggle.open {
+			transform: translateY(-85vh) rotate(180deg);
+		}
+
+		.stats-panel {
+			width: 100%;
+			height: 85vh;
+			border-left: none;
+			border-right: none;
+			border-top: 2px solid #ffd700;
+			border-radius: 16px 16px 0 0;
+			top: auto;
+			bottom: 0;
+			transform: translateY(100%);
+			box-shadow:
+				0 -4px 40px rgba(255, 215, 0, 0.3),
+				0 -8px 80px rgba(255, 215, 0, 0.15);
+		}
+
+		.stats-panel.visible {
+			transform: translateY(0);
+		}
+
+		.character-portrait {
+			width: 100px;
+			height: 100px;
+		}
+
+		.character-name {
+			font-size: 1.2rem;
+		}
+
+		.character-stats-bar {
+			gap: 1rem;
 			font-size: 0.8rem;
 		}
 	}
