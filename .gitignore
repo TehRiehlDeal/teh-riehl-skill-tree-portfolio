@@ -5,6 +5,10 @@ node_modules
 .vercel
 .netlify
 .wrangler
+.claude
+CLAUDE.md
+docs/
+session_summary.md
 /.svelte-kit
 /build
 
