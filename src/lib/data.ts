@@ -71,7 +71,7 @@ export const treeNodes: TreeNode[] = [
 		icon: '',
 		fullName: 'Kevin Riehl',
 		jobTitle: 'Software Development - Lead Associate',
-		aboutMe: 'Intermediate Software Engineer with 5+ years of experience architecting full-stack applications using React, Node.js (Hapi), and SQL. Expertise includes modernizing legacy codebases, implementing rigorous testing standards, and leading frontend architecture improvements. passionate about leveraging modern tools like ShadCN and Docker to streamline development workflows.',
+		aboutMe: 'Intermediate Software Engineer with 5+ years of experience architecting full-stack applications using React, Node.js (Hapi), and SQL. Expertise includes modernizing legacy codebases, implementing rigorous testing standards, and leading frontend architecture improvements. Passionate about leveraging modern tools like ShadCN and Docker to streamline development workflows.',
 		location: 'Kent, WA',
 		email: 'kevinriehl@gmail.com',
 		linkedIn: 'https://www.linkedin.com/in/kevinriehl',
