@@ -537,32 +537,6 @@
 				// Two touches - start pinch zoom
 				isDragging = false;
 				isTouchZooming = true;
-				const dx = e.touches[0].clientX - e.touches[1].clientX;
-				const dy = e.touches[0].clientY - e.touches[1].clientY;
-				lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
-			}
-		}, { passive: true });
-
-		// ========== TOUCH EVENTS FOR PANNING & ZOOMING ==========
-		let touchStartedOnNode = false;
-
-		app.canvas.addEventListener('touchstart', (e: TouchEvent) => {
-			// Check if touch started on a node by seeing if the target is interactive
-			touchStartedOnNode = false;
-			
-			if (e.touches.length === 1) {
-				// Single touch - prepare for potential panning
-				isDragging = true;
-				hasMoved = false;
-				isTouchZooming = false;
-				dragStartX = e.touches[0].clientX;
-				dragStartY = e.touches[0].clientY;
-				containerStartX = treeContainer.x;
-				containerStartY = treeContainer.y;
-			} else if (e.touches.length === 2) {
-				// Two touches - start pinch zoom
-				isDragging = false;
-				isTouchZooming = true;
 				hasMoved = true; // Pinch zoom counts as movement
 				const dx = e.touches[0].clientX - e.touches[1].clientX;
 				const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -672,21 +646,48 @@
 			return Math.sqrt(node.x * node.x + node.y * node.y);
 		}
 
-		// ========== DRAW GLOWING LINES ==========
-		const lineObjects: { graphics: Graphics; glowGraphics: Graphics; node: TreeNode; parent: TreeNode }[] = [];
+		// ========== DRAW GLOWING LINES WITH PLASMA BEAMS ==========
+		const lineObjects: {
+			graphics: Graphics;
+			glowGraphics: Graphics;
+			plasmaBeam: Graphics;
+			node: TreeNode;
+			parent: TreeNode;
+			intensity: number;
+		}[] = [];
 
 		for (const node of treeNodes) {
 			if (node.parentId) {
 				const parent = getNodeById(node.parentId);
 				if (parent) {
+					// Calculate beam intensity based on years of experience (for skill nodes)
+					let intensity = 0.3; // Default base intensity
+					if (node.category === 'skills' && node.yearsOfExperience) {
+						// Scale from 0.3 (beginner) to 1.0 (10+ years)
+						intensity = Math.min(0.3 + (node.yearsOfExperience / 10) * 0.7, 1.0);
+					} else if (node.category === 'experience') {
+						// Experience nodes get medium-high intensity
+						intensity = 0.7;
+					} else if (node.category === 'origin') {
+						// Origin connections are always bright
+						intensity = 1.0;
+					} else {
+						// Projects and education get medium intensity
+						intensity = 0.5;
+					}
+
+					const color = categoryColors[node.category];
+
+					// Base glow layer (wide, soft)
 					const glowGraphics = new Graphics();
 					glowGraphics.alpha = 0;
 					glowGraphics
 						.moveTo(parent.x, parent.y)
 						.lineTo(node.x, node.y)
-						.stroke({ width: 8, color: categoryColors[node.category], alpha: 0.15 });
+						.stroke({ width: 12, color: color, alpha: 0.1 * intensity });
 					treeContainer.addChild(glowGraphics);
 
+					// Core line (thin, solid)
 					const lineGraphics = new Graphics();
 					lineGraphics.alpha = 0;
 					lineGraphics
@@ -695,7 +696,23 @@
 						.stroke({ width: 2, color: 0x4a4a5a });
 					treeContainer.addChild(lineGraphics);
 
-					lineObjects.push({ graphics: lineGraphics, glowGraphics, node, parent });
+					// Plasma energy beam (medium, bright, animated)
+					const plasmaBeam = new Graphics();
+					plasmaBeam.alpha = 0;
+					plasmaBeam
+						.moveTo(parent.x, parent.y)
+						.lineTo(node.x, node.y)
+						.stroke({ width: 4, color: color, alpha: 0.6 * intensity });
+					treeContainer.addChild(plasmaBeam);
+
+					lineObjects.push({
+						graphics: lineGraphics,
+						glowGraphics,
+						plasmaBeam,
+						node,
+						parent,
+						intensity
+					});
 				}
 			}
 		}
@@ -751,7 +768,8 @@
 				profileContainer.alpha = 0;
 				profileContainer.scale.set(0.5);
 
-				profileContainer.eventMode = 'static';
+				// Disable interactivity until animation completes
+				profileContainer.eventMode = 'none';
 				profileContainer.cursor = 'pointer';
 
 				profileContainer.on('pointerdown', () => {
@@ -817,7 +835,8 @@
 				nodeContainer.alpha = 0;
 				nodeContainer.scale.set(0.5);
 
-				nodeContainer.eventMode = 'static';
+				// Disable interactivity until animation completes
+				nodeContainer.eventMode = 'none';
 				nodeContainer.cursor = 'pointer';
 
 				nodeContainer.on('pointerdown', () => {
@@ -860,10 +879,11 @@
 		const zoomDuration = isMobile ? 2.5 : 4.5;
 		const nodeStagger = isMobile ? 0.05 : 0.08;
 		
-		// Hide all lines initially
+		// Hide all lines and plasma beams initially
 		lineObjects.forEach((line) => {
 			line.graphics.alpha = 0;
 			line.glowGraphics.alpha = 0;
+			line.plasmaBeam.alpha = 0;
 		});
 		
 		// Hide all nodes initially
@@ -906,6 +926,12 @@
 				duration: originDuration,
 				delay: originDelay,
 				ease: 'back.out(1.7)',
+				onComplete: () => {
+					// Enable interactivity after animation completes
+					if (originNode.graphics instanceof Container) {
+						originNode.graphics.eventMode = 'static';
+					}
+				},
 			});
 			gsap.to(originNode.glowGraphics, {
 				alpha: 1,
@@ -932,7 +958,7 @@
 		
 		otherNodes.forEach((obj, index) => {
 			const delay = nodeStartDelay + (index * nodeStagger);
-			
+
 			gsap.to(obj.graphics, {
 				alpha: 1,
 				duration: 0.5,
@@ -945,6 +971,12 @@
 				duration: 0.5,
 				delay: delay,
 				ease: 'back.out(1.7)',
+				onComplete: () => {
+					// Enable interactivity after animation completes
+					if (obj.graphics instanceof Container) {
+						obj.graphics.eventMode = 'static';
+					}
+				},
 			});
 			gsap.to(obj.glowGraphics, {
 				alpha: 1,
@@ -978,23 +1010,60 @@
 			});
 		}
 		
-		// STEP 4: Animate lines as nodes appear
+		// STEP 4: Animate lines and plasma beams as nodes appear
 		const lineStartDelay = isMobile ? titleDuration - 0.3 : titleDuration + 0.4;
-		
+
 		sortedLines.forEach((line, index) => {
 			const delay = lineStartDelay + (index * nodeStagger);
-			
+
+			// Core line appears first
 			gsap.to(line.graphics, {
 				alpha: 1,
 				duration: 0.4,
 				delay: delay,
 				ease: 'power2.out',
 			});
+
+			// Base glow appears with line
 			gsap.to(line.glowGraphics, {
 				alpha: 1,
 				duration: 0.6,
 				delay: delay + 0.1,
 				ease: 'power2.out',
+			});
+
+			// Plasma beam fades in
+			gsap.to(line.plasmaBeam, {
+				alpha: 1,
+				duration: 0.8,
+				delay: delay + 0.2,
+				ease: 'power2.out',
+				onComplete: () => {
+					// After beam appears, start continuous pulsing animation
+					const pulseDuration = 2.0 + Math.random() * 1.0; // Vary pulse speed
+					const maxAlpha = 0.9 * line.intensity; // Base alpha on intensity
+					const minAlpha = 0.6 * line.intensity; // Minimum brightness - stays visible
+
+					// Pulsing alpha animation (breathing effect)
+					gsap.to(line.plasmaBeam, {
+						alpha: minAlpha,
+						duration: pulseDuration,
+						ease: 'sine.inOut',
+						yoyo: true,
+						repeat: -1,
+					});
+
+					// Glow layer also pulses
+					const glowMaxAlpha = 0.2 * line.intensity;
+					const glowMinAlpha = 0.12 * line.intensity;
+					gsap.to(line.glowGraphics, {
+						alpha: glowMinAlpha,
+						duration: pulseDuration * 1.2,
+						ease: 'sine.inOut',
+						yoyo: true,
+						repeat: -1,
+					});
+				},
 			});
 		});
 			
@@ -2157,12 +2226,12 @@
 		}
 
 		.stats-panel-toggle.open {
-			transform: translateY(-85vh) rotate(180deg);
+			transform: translateY(-85dvh) rotate(180deg);
 		}
 
 		.stats-panel {
 			width: 100%;
-			height: 85vh;
+			height: 85dvh;
 			border-left: none;
 			border-right: none;
 			border-top: 2px solid #ffd700;
