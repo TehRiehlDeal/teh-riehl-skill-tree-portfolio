@@ -287,6 +287,20 @@ export const treeNodes: TreeNode[] = [
 		pypiUrl: 'https://pypi.org/project/tvdbAPI/',
 		status: 'maintained'
 	},
+	{
+		id: 'proj-image-resize',
+		label: 'Image Resize Tool',
+		description: 'GUI-based batch image processor with intelligent whitespace trimming and automated resizing workflows. Features folder-based processing for brand-specific transformations and maintains aspect ratios.',
+		x: -460,
+		y: -180,
+		parentId: 'proj-opensource',
+		category: 'projects',
+		size: 'small',
+		icon: '/icons/python.svg',
+		techStack: ['Python', 'PIL/Pillow', 'Tkinter', 'Image Processing'],
+		repoUrl: 'https://github.com/TehRiehlDeal/python-image-resize',
+		status: 'completed'
+	},
 
 	// ========== PERSONAL TOOLS CHILDREN ==========
 	{
