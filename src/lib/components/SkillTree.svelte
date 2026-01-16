@@ -6,31 +6,38 @@
 	import { treeNodes, categoryColors, type TreeNode } from '$lib/data';
 
 	let container: HTMLDivElement;
-	let selectedNode: TreeNode | null = null;
-	let modalVisible = false;
-	let showWelcomeTitle = true;
+	let selectedNode = $state<TreeNode | null>(null);
+	let modalVisible = $state(false);
+	let showWelcomeTitle = $state(true);
 
 	// Tooltip state
-	let hoveredNode: TreeNode | null = null;
-	let tooltipX = 0;
-	let tooltipY = 0;
+	let hoveredNode = $state<TreeNode | null>(null);
+	let tooltipX = $state(0);
+	let tooltipY = $state(0);
 
 	// Screen size detection
-	let isMobile = false;
-	let windowWidth = 0;
-	let windowHeight = 0;
+	let isMobile = $state(false);
+	let windowWidth = $state(0);
+	let windowHeight = $state(0);
 
 	let modalOpenedAt = 0;
 
+	// Parallax state - track initial tree position for offset calculations
+	let initialTreeX = 0;
+	let initialTreeY = 0;
+
+	// Loading state for Lighthouse LCP detection
+	let isLoading = $state(true);
+
 	// Stats panel state
-	let statsPanelVisible = false;
-	let expandedBranches = new Set<string>([
+	let statsPanelVisible = $state(false);
+	let expandedBranches = $state(new Set<string>([
 		'concepts',
 		'tools-devops',
 		'frontend',
 		'backend-real-time',
 		'languages'
-	]); // All expanded by default
+	])); // All expanded by default
 
 	function openModal(node: TreeNode) {
 		selectedNode = node;
@@ -142,11 +149,11 @@
 	}
 
 	// Stats calculations (reactive)
-	$: playerLevel = calculatePlayerLevel();
-	$: playerClass = getPlayerClass();
-	$: skillsByBranch = aggregateSkills();
-	$: skillCounts = countByProficiency();
-	$: totalSkills = Object.values(skillCounts).reduce((sum, count) => sum + count, 0);
+	let playerLevel = $derived(calculatePlayerLevel());
+	let playerClass = $derived(getPlayerClass());
+	let skillsByBranch = $derived(aggregateSkills());
+	let skillCounts = $derived(countByProficiency());
+	let totalSkills = $derived(Object.values(skillCounts).reduce((sum, count) => sum + count, 0));
 
 	// Update screen size
 	function handleResize() {
@@ -154,6 +161,8 @@
 		windowHeight = window.innerHeight;
 		isMobile = windowWidth < 768;
 	}
+
+	let cleanupFunctions: (() => void)[] = [];
 
 	onMount(async () => {
 		handleResize();
@@ -170,6 +179,9 @@
 		});
 
 		container.appendChild(app.canvas);
+
+		// Hide loading indicator - PixiJS is ready, welcome title will be LCP
+		isLoading = false;
 
 		// ========== BACKGROUND LAYERS ==========
 		// We create multiple layers for depth
@@ -465,6 +477,10 @@
 		treeContainer.x = app.screen.width / 2;
 		treeContainer.y = app.screen.height / 2;
 
+		// Track initial position for parallax calculations
+		initialTreeX = treeContainer.x;
+		initialTreeY = treeContainer.y;
+
 		// Start zoomed in - will zoom out after welcome title
 		// Mobile needs to zoom out further to show more of the tree
 		const startScale = isMobile ? 3 : 4;
@@ -507,6 +523,7 @@
 			}
 			treeContainer.x = containerStartX + dx;
 			treeContainer.y = containerStartY + dy;
+			updateParallax();
 		});
 
 		window.addEventListener('mouseup', () => {
@@ -555,6 +572,7 @@
 					hasMoved = true;
 					treeContainer.x = containerStartX + dx;
 					treeContainer.y = containerStartY + dy;
+					updateParallax();
 				}
 			} else if (e.touches.length === 2 && isTouchZooming) {
 				// Two touches - pinch zoom
@@ -567,20 +585,9 @@
 					let newScale = treeContainer.scale.x * scale;
 					newScale = Math.max(minZoom, Math.min(maxZoom, newScale));
 
-					// Zoom toward center of the two touches
-					const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-					const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-					const rect = app.canvas.getBoundingClientRect();
-					const mouseX = centerX - rect.left;
-					const mouseY = centerY - rect.top;
-
-					const oldScale = treeContainer.scale.x;
-					const worldX = (mouseX - treeContainer.x) / oldScale;
-					const worldY = (mouseY - treeContainer.y) / oldScale;
-
+					// Zoom centered on origin node (same as mouse wheel zoom)
 					treeContainer.scale.set(newScale);
-					treeContainer.x = mouseX - worldX * newScale;
-					treeContainer.y = mouseY - worldY * newScale;
+					updateParallax();
 				}
 
 				lastTouchDistance = distance;
@@ -608,17 +615,15 @@
 		// ========== SCROLL EVENT FOR ZOOMING ==========
 		app.canvas.addEventListener('wheel', (e: WheelEvent) => {
 			e.preventDefault();
-			const rect = app.canvas.getBoundingClientRect();
-			const mouseX = e.clientX - rect.left;
-			const mouseY = e.clientY - rect.top;
 			const oldScale = treeContainer.scale.x;
 			const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
 			let newScale = Math.max(minZoom, Math.min(maxZoom, oldScale * zoomFactor));
-			const worldX = (mouseX - treeContainer.x) / oldScale;
-			const worldY = (mouseY - treeContainer.y) / oldScale;
+
+			// Zoom centered on origin node (0,0 in tree space)
+			// Since origin is at (0,0), it's always at screen position (treeContainer.x, treeContainer.y)
+			// Just changing scale keeps the origin in the same screen position
 			treeContainer.scale.set(newScale);
-			treeContainer.x = mouseX - worldX * newScale;
-			treeContainer.y = mouseY - worldY * newScale;
+			updateParallax();
 		});
 
 		// ========== HELPER FUNCTIONS ==========
@@ -644,6 +649,30 @@
 
 		function getDistanceFromOrigin(node: TreeNode): number {
 			return Math.sqrt(node.x * node.x + node.y * node.y);
+		}
+
+		// ========== PARALLAX UPDATE ==========
+		function updateParallax() {
+			// Calculate tree offset from initial position
+			const treeDeltaX = treeContainer.x - initialTreeX;
+			const treeDeltaY = treeContainer.y - initialTreeY;
+
+			// Parallax position factors (subtle intensity)
+			const starFactor = 0.10;
+			const nebulaFactor = 0.07;
+			const gradientFactor = 0.05;
+
+			// Update positions - backgrounds lag behind tree movement
+			starContainer.x = treeDeltaX * starFactor;
+			starContainer.y = treeDeltaY * starFactor;
+
+			nebulaContainer.x = treeDeltaX * nebulaFactor;
+			nebulaContainer.y = treeDeltaY * nebulaFactor;
+
+			deepBackgroundContainer.x = treeDeltaX * gradientFactor;
+			deepBackgroundContainer.y = treeDeltaY * gradientFactor;
+
+			// No scale parallax - backgrounds keep scale 1.0
 		}
 
 		// ========== DRAW GLOWING LINES WITH PLASMA BEAMS ==========
@@ -943,13 +972,14 @@
 		
 		// STEP 2: Start zoom out after origin appears
 		const zoomDelay = isMobile ? titleDuration - 0.3 : titleDuration + 0.3;
-		
+
 		gsap.to(treeContainer.scale, {
 			x: endScale,
 			y: endScale,
 			duration: zoomDuration,
 			delay: zoomDelay,
 			ease: 'power1.out',
+			onUpdate: updateParallax
 		});
 		
 		// STEP 3: Animate in the rest of the nodes (excluding origin)
@@ -1083,7 +1113,7 @@
 			});
 		}
 
-		// Keyboard event handler for stats panel
+		// Keyboard event handler for stats panel and navigation
 		function handleKeydown(e: KeyboardEvent) {
 			// Toggle stats panel with 'C' key
 			if (e.key === 'c' || e.key === 'C') {
@@ -1100,20 +1130,93 @@
 					toggleStatsPanel();
 				}
 			}
+
+			// Keyboard navigation for tree panning and zooming
+			const panSpeed = 50;
+			const zoomSpeed = 0.1;
+
+			// Arrow keys for panning
+			if (e.key === 'ArrowUp') {
+				e.preventDefault();
+				treeContainer.y += panSpeed;
+				updateParallax();
+			} else if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				treeContainer.y -= panSpeed;
+				updateParallax();
+			} else if (e.key === 'ArrowLeft') {
+				e.preventDefault();
+				treeContainer.x += panSpeed;
+				updateParallax();
+			} else if (e.key === 'ArrowRight') {
+				e.preventDefault();
+				treeContainer.x -= panSpeed;
+				updateParallax();
+			}
+
+			// + and = for zoom in
+			if (e.key === '+' || e.key === '=') {
+				e.preventDefault();
+				const currentScale = treeContainer.scale.x;
+				let newScale = Math.min(maxZoom, currentScale + zoomSpeed);
+				treeContainer.scale.set(newScale);
+				updateParallax();
+			}
+
+			// - for zoom out
+			if (e.key === '-') {
+				e.preventDefault();
+				const currentScale = treeContainer.scale.x;
+				let newScale = Math.max(minZoom, currentScale - zoomSpeed);
+				treeContainer.scale.set(newScale);
+				updateParallax();
+			}
+
+			// R to reset view to origin
+			if (e.key === 'r' || e.key === 'R') {
+				e.preventDefault();
+				gsap.to(treeContainer, {
+					x: app.screen.width / 2,
+					y: app.screen.height / 2,
+					duration: 0.5,
+					ease: 'power2.out',
+					onUpdate: updateParallax,
+					onComplete: () => {
+						// Update initial positions after reset
+						initialTreeX = treeContainer.x;
+						initialTreeY = treeContainer.y;
+					}
+				});
+				gsap.to(treeContainer.scale, {
+					x: endScale,
+					y: endScale,
+					duration: 0.5,
+					ease: 'power2.out',
+					onUpdate: updateParallax
+				});
+			}
 		}
 
 		window.addEventListener('keydown', handleKeydown);
 
 		console.log('✨ Responsive skill tree loaded!');
 
-		return () => {
+		// Store cleanup functions
+		cleanupFunctions.push(() => {
 			window.removeEventListener('resize', handleResize);
 			window.removeEventListener('keydown', handleKeydown);
+		});
+	});
+
+	// Cleanup on component unmount
+	$effect(() => {
+		return () => {
+			cleanupFunctions.forEach(fn => fn());
 		};
 	});
 
 	// Calculate tooltip position to keep it on screen
-	$: tooltipStyle = (() => {
+	let tooltipStyle = $derived.by(() => {
 		let x = tooltipX + 15;
 		let y = tooltipY + 15;
 
@@ -1129,12 +1232,27 @@
 		}
 
 		return `left: ${x}px; top: ${y}px;`;
-	})();
+	});
 </script>
 
 <svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
 
-<div bind:this={container} class="canvas-container"></div>
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div
+	bind:this={container}
+	class="canvas-container"
+	role="application"
+	aria-label="Interactive skill tree visualization. Use arrow keys to pan, +/- to zoom, R to reset view, C to toggle character stats panel."
+	tabindex="0"
+></div>
+
+<!-- Loading Indicator for Lighthouse LCP -->
+{#if isLoading}
+	<div class="loading-indicator">
+		<div class="spinner"></div>
+		<p>Loading Atlas of Skills...</p>
+	</div>
+{/if}
 
 <!-- Welcome Title Card -->
 {#if showWelcomeTitle}
@@ -1148,6 +1266,8 @@
 {#if hoveredNode && !modalVisible && !isMobile}
 	<div
 		class="tooltip"
+		role="tooltip"
+		aria-live="polite"
 		style="{tooltipStyle} --node-color: {getCategoryColorHex(hoveredNode.category)};"
 	>
 		<h3>
@@ -1168,19 +1288,24 @@
 		class:visible={modalVisible}
 		on:click={closeModal}
 		on:keydown={(e) => e.key === 'Escape' && closeModal()}
-		role="button"
-		tabindex="0"
+		role="presentation"
+		aria-label="Modal backdrop. Click to close or press Escape."
 	>
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_interactive_supports_focus -->
 		<div
 			class="modal"
 			class:visible={modalVisible}
 			on:click|stopPropagation
 			role="dialog"
+			aria-modal="true"
+			aria-labelledby="modal-title"
+			aria-describedby="modal-description"
 			style="--node-color: {getCategoryColorHex(selectedNode.category)}"
 		>
-			<button class="close-btn" on:click={closeModal}>✕</button>
+			<button class="close-btn" on:click={closeModal} aria-label="Close dialog">✕</button>
 
-			<h2>
+			<h2 id="modal-title">
 				{#if selectedNode.icon}
 					<img src={selectedNode.icon} alt="" class="modal-icon" />
 				{/if}
@@ -1188,6 +1313,8 @@
 			</h2>
 
 			<span class="category-badge">{selectedNode.category}</span>
+
+			<div id="modal-description">
 
 			<!-- Origin-specific content -->
 			{#if selectedNode.category === 'origin'}
@@ -1203,16 +1330,16 @@
 				{#if selectedNode.email || selectedNode.linkedIn || selectedNode.github || selectedNode.website}
 					<div class="social-links">
 						{#if selectedNode.email}
-							<a href="mailto:{selectedNode.email}" title="Email">✉️ Email</a>
+							<a href="mailto:{selectedNode.email}" title="Email" aria-label="Send email">✉️ Email</a>
 						{/if}
 						{#if selectedNode.linkedIn}
-							<a href={selectedNode.linkedIn} target="_blank" rel="noopener noreferrer" title="LinkedIn">💼 LinkedIn</a>
+							<a href={selectedNode.linkedIn} target="_blank" rel="noopener noreferrer" title="LinkedIn" aria-label="LinkedIn profile (opens in new tab)">💼 LinkedIn</a>
 						{/if}
 						{#if selectedNode.github}
-							<a href={selectedNode.github} target="_blank" rel="noopener noreferrer" title="GitHub">💻 GitHub</a>
+							<a href={selectedNode.github} target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub profile (opens in new tab)">💻 GitHub</a>
 						{/if}
 						{#if selectedNode.website}
-							<a href={selectedNode.website} target="_blank" rel="noopener noreferrer" title="Website">🌐 Website</a>
+							<a href={selectedNode.website} target="_blank" rel="noopener noreferrer" title="Website" aria-label="Personal website (opens in new tab)">🌐 Website</a>
 						{/if}
 					</div>
 					{#if selectedNode.resumeUrl}
@@ -1293,19 +1420,20 @@
 			{#if selectedNode.projectUrl || selectedNode.repoUrl || selectedNode.pypiUrl || selectedNode.npmUrl}
 				<div class="links">
 					{#if selectedNode.projectUrl}
-						<a href={selectedNode.projectUrl} target="_blank" rel="noopener noreferrer">🔗 Live Site</a>
+						<a href={selectedNode.projectUrl} target="_blank" rel="noopener noreferrer" aria-label="Live site (opens in new tab)">🔗 Live Site</a>
 					{/if}
 					{#if selectedNode.repoUrl}
-						<a href={selectedNode.repoUrl} target="_blank" rel="noopener noreferrer">💻 Repository</a>
+						<a href={selectedNode.repoUrl} target="_blank" rel="noopener noreferrer" aria-label="Code repository (opens in new tab)">💻 Repository</a>
 					{/if}
 					{#if selectedNode.pypiUrl}
-						<a href={selectedNode.pypiUrl} target="_blank" rel="noopener noreferrer">📦 PyPI</a>
+						<a href={selectedNode.pypiUrl} target="_blank" rel="noopener noreferrer" aria-label="Python package on PyPI (opens in new tab)">📦 PyPI</a>
 					{/if}
 					{#if selectedNode.npmUrl}
-						<a href={selectedNode.npmUrl} target="_blank" rel="noopener noreferrer">📦 npm</a>
+						<a href={selectedNode.npmUrl} target="_blank" rel="noopener noreferrer" aria-label="npm package (opens in new tab)">📦 npm</a>
 					{/if}
 				</div>
 			{/if}
+			</div>
 		</div>
 	</div>
 {/if}
@@ -1317,17 +1445,32 @@
 	on:click={toggleStatsPanel}
 	title="Character Stats (C)"
 	aria-label="Toggle Character Stats Panel (Keyboard shortcut: C)"
+	aria-expanded={statsPanelVisible}
+	aria-controls="stats-panel"
 >
 	⚙️
 </button>
 
 <!-- Stats Panel Backdrop -->
 {#if statsPanelVisible}
-	<div class="stats-panel-backdrop visible" on:click={toggleStatsPanel}></div>
+	<div
+		class="stats-panel-backdrop visible"
+		on:click={toggleStatsPanel}
+		on:keydown={(e) => e.key === 'Escape' && toggleStatsPanel()}
+		role="presentation"
+		aria-label="Stats panel backdrop. Click to close or press Escape."
+	></div>
 {/if}
 
 <!-- Stats Panel -->
-<div class="stats-panel" class:visible={statsPanelVisible} role="complementary" aria-label="Character Statistics">
+<div
+	id="stats-panel"
+	class="stats-panel"
+	class:visible={statsPanelVisible}
+	role="complementary"
+	aria-label="Character Statistics"
+	aria-hidden={!statsPanelVisible}
+>
 	<!-- Character Card -->
 	<div class="character-card">
 		<img src="/headshot.jpg" alt="Character Portrait" class="character-portrait" />
@@ -1426,10 +1569,21 @@
 </div>
 
 <style>
+	/* Global focus indicators for accessibility */
+	*:focus-visible {
+		outline: 2px solid #ffd700;
+		outline-offset: 2px;
+	}
+
 	.canvas-container {
 		width: 100%;
 		height: 100%;
 		touch-action: none;
+	}
+
+	.canvas-container:focus-visible {
+		outline: 3px solid #ffd700;
+		outline-offset: -3px;
 	}
 
 	/* Tooltip Styles */
@@ -1826,6 +1980,40 @@
 	.status-badge.archived {
 		background: #4a5568;
 		color: #e2e8f0;
+	}
+
+	/* Loading Indicator for Lighthouse LCP */
+	.loading-indicator {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		text-align: center;
+		z-index: 1000;
+		color: #ffd700;
+	}
+
+	.loading-indicator p {
+		font-family: 'Cinzel Decorative', 'Trajan Pro', serif;
+		font-size: 1.2rem;
+		margin-top: 1rem;
+		color: #ffd700;
+		text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+	}
+
+	.spinner {
+		width: 50px;
+		height: 50px;
+		border: 4px solid rgba(255, 215, 0, 0.2);
+		border-top: 4px solid #ffd700;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+		margin: 0 auto;
+	}
+
+	@keyframes spin {
+		0% { transform: rotate(0deg); }
+		100% { transform: rotate(360deg); }
 	}
 
 	.welcome-title {
