@@ -11,6 +11,8 @@ docs/
 session_summary.md
 /.svelte-kit
 /build
+ACCESSIBILITY_PWA_IMPROVEMENTS.md
+PWA_ICONS_GUIDE.md
 
 # OS
 .DS_Store
