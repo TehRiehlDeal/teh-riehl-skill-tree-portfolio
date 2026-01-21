@@ -330,6 +330,20 @@ export const treeNodes: TreeNode[] = [
 		projectUrl: 'https://tehriehldeal.com',
 		repoUrl: 'https://github.com/yourusername/skill-tree-portfolio',
 	},
+	{
+		id: 'proj-character-builder',
+		label: 'Pathfinder 2E Character Builder',
+		description: 'Web-based character creation tool for Pathfinder 2E tabletop RPG. Features modern component-based architecture with comprehensive testing and code quality tooling.',
+		x: -450,
+		y: 10,
+		parentId: 'proj-tools',
+		category: 'projects',
+		size: 'small',
+		icon: '/icons/svelte.svg',
+		techStack: ['Svelte', 'TypeScript', 'Vite', 'Vitest', 'Playwright', 'ESLint'],
+		repoUrl: 'https://github.com/TehRiehlDeal/teh-riehl-character-builder',
+		status: 'active'
+	},
 
 	// ========== SKILLS (Bottom Right Quadrant) ==========
 	{
